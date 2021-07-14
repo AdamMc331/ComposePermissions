@@ -4,23 +4,22 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Button
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.adammcneilly.composepermissions.ui.theme.ComposePermissionsTheme
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.MultiplePermissionsState
 import com.google.accompanist.permissions.PermissionState
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.accompanist.permissions.rememberPermissionState
 
 @OptIn(ExperimentalPermissionsApi::class)
@@ -30,8 +29,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             ComposePermissionsTheme {
-                val cameraPermissionState = rememberPermissionState(
-                    permission = android.Manifest.permission.CAMERA
+                val cameraStoragePermissionState = rememberMultiplePermissionsState(
+                    permissions = listOf(
+                        android.Manifest.permission.CAMERA,
+                        android.Manifest.permission.READ_EXTERNAL_STORAGE,
+                    )
                 )
 
                 Surface {
@@ -40,18 +42,18 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(16.dp),
                     ) {
                         when {
-                            cameraPermissionState.hasPermission -> {
+                            cameraStoragePermissionState.allPermissionsGranted -> {
                                 PermissionGrantedButton()
                             }
-                            cameraPermissionState.hasBeenDeniedForever() -> {
-                                PermissionDeniedButton()
+                            cameraStoragePermissionState.hasBeenDeniedForever() -> {
+                                PermissionDeniedButton(cameraStoragePermissionState.revokedPermissionNames())
                             }
                             else -> {
-                                if (cameraPermissionState.shouldShowRationale) {
-                                    PermissionRationale()
+                                if (cameraStoragePermissionState.shouldShowRationale) {
+                                    PermissionRationale(cameraStoragePermissionState.revokedPermissionNames())
                                 }
 
-                                RequestPermissionButton(cameraPermissionState)
+                                RequestPermissionButton(cameraStoragePermissionState)
                             }
                         }
                     }
@@ -61,9 +63,9 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun PermissionRationale() {
+    private fun PermissionRationale(revokedPermissionNames: String) {
         Text(
-            "This is a rationale explaining why we need the camera permission. We " +
+            "This is a rationale explaining why we need the following permissions: $revokedPermissionNames. We " +
                     "are displaying this because the user has denied the permission once."
         )
     }
@@ -71,12 +73,12 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun PermissionGrantedButton() {
         Button(onClick = { /*TODO*/ }) {
-            Text("Camera permission granted.")
+            Text("Camera and storage permissions granted.")
         }
     }
 
     @Composable
-    private fun PermissionDeniedButton() {
+    private fun PermissionDeniedButton(revokedPermissionNames: String) {
         Button(
             onClick = {
                 startActivity(
@@ -87,20 +89,20 @@ class MainActivity : ComponentActivity() {
                 )
             }
         ) {
-            Text("Camera permission denied for good - open settings.")
+            Text("The $revokedPermissionNames permission(s) was denied - open settings.")
         }
     }
 
     @Composable
-    private fun RequestPermissionButton(cameraPermissionState: PermissionState) {
+    private fun RequestPermissionButton(cameraPermissionState: MultiplePermissionsState) {
         Button(
             onClick = {
                 // This fails silently if permission is not in manifest.
                 // Is this expected?
-                cameraPermissionState.launchPermissionRequest()
+                cameraPermissionState.launchMultiplePermissionRequest()
             }
         ) {
-            Text("Request camera permission.")
+            Text("Request camera and/or storage permission.")
         }
     }
 }
@@ -113,6 +115,13 @@ class MainActivity : ComponentActivity() {
  * that we can determine if they've denied it before.
  */
 @OptIn(ExperimentalPermissionsApi::class)
-fun PermissionState.hasBeenDeniedForever(): Boolean {
+fun MultiplePermissionsState.hasBeenDeniedForever(): Boolean {
     return this.permissionRequested && !this.shouldShowRationale
+}
+
+@OptIn(ExperimentalPermissionsApi::class)
+fun MultiplePermissionsState.revokedPermissionNames(): String {
+    return this.revokedPermissions.joinToString { permissionState ->
+        permissionState.permission.removePrefix("android.permission.")
+    }
 }
