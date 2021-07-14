@@ -1,6 +1,9 @@
 package com.adammcneilly.composepermissions
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -74,7 +77,16 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun PermissionDeniedButton() {
-        Button(onClick = { /*TODO*/ }) {
+        Button(
+            onClick = {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.fromParts("package", packageName, null)
+                    )
+                )
+            }
+        ) {
             Text("Camera permission denied for good - open settings.")
         }
     }
@@ -96,6 +108,9 @@ class MainActivity : ComponentActivity() {
 /**
  * If we should avoid showing a rationale, and we know the user has requested a permission before,
  * this means they have said deny and don't ask me again.
+ *
+ * On app startup this will be false, it's not until the user requests a permission at least once
+ * that we can determine if they've denied it before.
  */
 @OptIn(ExperimentalPermissionsApi::class)
 fun PermissionState.hasBeenDeniedForever(): Boolean {
